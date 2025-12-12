@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "667527120882",
+    "project_id": "surat-eb1ae",
+    "storage_bucket": "surat-eb1ae.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:667527120882:android:db8d2887592d0cc5258d6b",
+        "android_client_info": {
+          "package_name": "com.example.skt_desa"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBsZkNvlLeBBy_1L44CPiDxIniF8tcZjW8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
