@@ -11,8 +11,11 @@ class DatabaseService {
       await _firestore.collection('surat').doc(surat.id).set(surat.toMap());
       return true;
     } catch (e) {
-      print(e.toString());
-      return false;
+      print('Error creating surat: $e');
+      if (e is FirebaseException) {
+        throw 'Gagal membuat surat: ${e.message}';
+      }
+      throw 'Terjadi kesalahan sistem saat membuat surat';
     }
   }
 
@@ -28,8 +31,11 @@ class DatabaseService {
           .map((doc) => SuratModel.fromMap(doc.data() as Map<String, dynamic>))
           .toList();
     } catch (e) {
-      print(e.toString());
-      return [];
+      print('Error getting surat by user: $e');
+      if (e is FirebaseException) {
+        throw 'Gagal memuat data surat: ${e.message}';
+      }
+      throw 'Terjadi kesalahan sistem saat memuat data surat';
     }
   }
 
@@ -44,8 +50,11 @@ class DatabaseService {
           .map((doc) => SuratModel.fromMap(doc.data() as Map<String, dynamic>))
           .toList();
     } catch (e) {
-      print(e.toString());
-      return [];
+      print('Error getting all surat: $e');
+      if (e is FirebaseException) {
+        throw 'Gagal memuat data surat: ${e.message}';
+      }
+      throw 'Terjadi kesalahan sistem saat memuat data surat';
     }
   }
 
@@ -63,8 +72,11 @@ class DatabaseService {
       await _firestore.collection('surat').doc(suratId).update(updateData);
       return true;
     } catch (e) {
-      print(e.toString());
-      return false;
+      print('Error updating surat status: $e');
+      if (e is FirebaseException) {
+        throw 'Gagal memperbarui status surat: ${e.message}';
+      }
+      throw 'Terjadi kesalahan sistem saat memperbarui status surat';
     }
   }
 
@@ -74,8 +86,11 @@ class DatabaseService {
       await _firestore.collection('berita').doc(berita.id).set(berita.toMap());
       return true;
     } catch (e) {
-      print(e.toString());
-      return false;
+      print('Error creating berita: $e');
+      if (e is FirebaseException) {
+        throw 'Gagal membuat berita: ${e.message}';
+      }
+      throw 'Terjadi kesalahan sistem saat membuat berita';
     }
   }
 
@@ -84,8 +99,11 @@ class DatabaseService {
       await _firestore.collection('berita').doc(berita.id).update(berita.toMap());
       return true;
     } catch (e) {
-      print(e.toString());
-      return false;
+      print('Error updating berita: $e');
+      if (e is FirebaseException) {
+        throw 'Gagal memperbarui berita: ${e.message}';
+      }
+      throw 'Terjadi kesalahan sistem saat memperbarui berita';
     }
   }
 
@@ -94,8 +112,11 @@ class DatabaseService {
       await _firestore.collection('berita').doc(beritaId).delete();
       return true;
     } catch (e) {
-      print(e.toString());
-      return false;
+      print('Error deleting berita: $e');
+      if (e is FirebaseException) {
+        throw 'Gagal menghapus berita: ${e.message}';
+      }
+      throw 'Terjadi kesalahan sistem saat menghapus berita';
     }
   }
 
@@ -110,8 +131,11 @@ class DatabaseService {
           .map((doc) => BeritaModel.fromMap(doc.data() as Map<String, dynamic>))
           .toList();
     } catch (e) {
-      print(e.toString());
-      return [];
+      print('Error getting all berita: $e');
+      if (e is FirebaseException) {
+        throw 'Gagal memuat data berita: ${e.message}';
+      }
+      throw 'Terjadi kesalahan sistem saat memuat data berita';
     }
   }
 }

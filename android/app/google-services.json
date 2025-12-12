@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "667527120882",
-    "project_id": "surat-eb1ae",
-    "storage_bucket": "surat-eb1ae.firebasestorage.app"
+    "project_number": "794258861666",
+    "project_id": "skt-desa",
+    "storage_bucket": "skt-desa.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:667527120882:android:db8d2887592d0cc5258d6b",
+        "mobilesdk_app_id": "1:794258861666:android:a6e6517b3a73141454eb3b",
         "android_client_info": {
           "package_name": "com.example.skt_desa"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyBsZkNvlLeBBy_1L44CPiDxIniF8tcZjW8"
+          "current_key": "AIzaSyBKVLVh1bzQYzTXpgpJ_Po3RNRzRnlfX5E"
         }
       ],
       "services": {

@@ -1,3 +1,4 @@
+// lib/services/auth_service.dart - Fixed logout implementation
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/user_model.dart';
@@ -54,10 +55,12 @@ class AuthService {
   // Sign out
   Future<void> signOut() async {
     try {
-      return await _auth.signOut();
+      await _auth.signOut();
+      // Clear any cached data if needed
+      // For example, clear provider data
     } catch (e) {
       print(e.toString());
-      return null;
+      throw 'Gagal logout: $e';
     }
   }
 

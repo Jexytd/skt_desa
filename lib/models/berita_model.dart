@@ -36,4 +36,20 @@ class BeritaModel {
       author: map['author'] ?? '',
     );
   }
+
+  BeritaModel copyWith({
+    String? judul,
+    String? author,
+    String? isi,
+    String? imageUrl,
+  }) {
+    return BeritaModel(
+      id: id,
+      judul: judul ?? this.judul,
+      author: author ?? this.author,
+      isi: isi ?? this.isi,
+      imageUrl: imageUrl ?? this.imageUrl,
+      tanggal: tanggal,
+    );
+  }
 }

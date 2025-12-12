@@ -1,0 +1,31 @@
+lib/
+├─ firebase_options.dart
+├─ main.dart
+├─ models/
+│  ├─ berita_model.dart
+│  ├─ surat_model.dart
+│  └─ user_model.dart
+├─ screens/
+│  ├─ admin/
+│  │  ├─ dashboard_screen.dart
+│  │  ├─ kelola_berita_screen.dart
+│  │  └─ kelola_surat_screen.dart
+│  ├─ auth/
+│  │  ├─ login_screen.dart
+│  │  └─ register_screen.dart
+│  └─ user/
+│     ├─ faq_screen.dart
+│     ├─ home_screen.dart
+│     ├─ layanan_screen.dart
+│     └─ profile_screen.dart
+├─ services/
+│  ├─ auth_service.dart
+│  ├─ database_service.dart
+│  └─ storage_service.dart
+├─ utils/
+│  ├─ constants.dart
+│  └─ helpers.dart
+└─ widgets/
+   ├─ custom_button_widget.dart
+   ├─ form_surat_widget.dart
+   └─ navbar_widget.dart

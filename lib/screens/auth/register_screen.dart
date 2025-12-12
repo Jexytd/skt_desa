@@ -4,7 +4,7 @@ import '../../services/auth_service.dart';
 import '../../utils/constants.dart';
 import '../../utils/helpers.dart';
 import '../../widgets/custom_button_widget.dart';
-import 'login_screen.dart'; // Tambahkan import untuk LoginScreen
+import 'login_screen.dart'; // Tambahkan import
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({Key? key}) : super(key: key);
@@ -39,32 +39,37 @@ class _RegisterScreenState extends State<RegisterScreen> {
         _isLoading = true;
       });
 
-      UserCredential? result = await AuthService().registerWithEmailAndPassword(
-        _emailController.text.trim(),
-        _passwordController.text,
-        _nameController.text,
-        _userRole,
-      );
+      try {
+        UserCredential? result = await AuthService()
+            .registerWithEmailAndPassword(
+              _emailController.text.trim(),
+              _passwordController.text,
+              _nameController.text,
+              _userRole,
+            );
 
-      setState(() {
-        _isLoading = false;
-      });
+        if (result != null) {
+          // Registrasi berhasil, tampilkan pesan sukses
+          Helpers.showSnackBar(
+            context,
+            'Registrasi berhasil! Silakan login dengan akun Anda.',
+            color: Colors.green,
+          );
 
-      if (result != null) {
-        // Registrasi berhasil, tampilkan pesan sukses
-        Helpers.showSnackBar(
-          context,
-          'Registrasi berhasil! Silakan login dengan akun Anda.',
-          color: Colors.green,
-        );
-
-        // Navigasi kembali ke halaman login
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const LoginScreen()),
-        );
-      } else {
-        Helpers.showSnackBar(context, 'Registrasi gagal, silakan coba lagi');
+          // Navigasi kembali ke halaman login
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const LoginScreen()),
+          );
+        } else {
+          Helpers.showSnackBar(context, 'Registrasi gagal, silakan coba lagi');
+        }
+      } catch (e) {
+        Helpers.showSnackBar(context, 'Registrasi gagal: $e');
+      } finally {
+        setState(() {
+          _isLoading = false;
+        });
       }
     }
   }

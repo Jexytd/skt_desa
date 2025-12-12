@@ -30,7 +30,6 @@ class AppStrings {
   static const keperluanLabel = 'Keperluan Penggunaan Surat';
   static const metodePenerimaanLabel = 'Metode Penerimaan Surat';
   
-  // Jenis Surat
   static const List<String> jenisSuratList = [
     'Surat Domisili',
     'Surat Keterangan Usaha',
@@ -55,10 +54,13 @@ class AppRoutes {
   static const login = '/login';
   static const register = '/register';
   static const home = '/home';
+  static const serviceSelection = '/service-selection';
   static const layanan = '/layanan';
   static const faq = '/faq';
   static const profile = '/profile';
   static const adminDashboard = '/admin/dashboard';
   static const kelolaBerita = '/admin/kelola-berita';
   static const kelolaSurat = '/admin/kelola-surat';
+  static const chat = '/chat';
+  static const adminChat = '/admin/chat';
 }

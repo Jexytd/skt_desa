@@ -1,413 +1,417 @@
 import 'package:flutter/material.dart';
-import '../../models/user_model.dart';
+import 'package:provider/provider.dart';
+import '../../providers/surat_provider.dart';
 import '../../models/surat_model.dart';
+import '../../models/user_model.dart';
 import '../../services/auth_service.dart';
-import '../../services/database_service.dart';
 import '../../utils/constants.dart';
 import '../../utils/helpers.dart';
+import '../../widgets/error_message.dart';
+import '../../widgets/surat_card.dart';
 import '../../widgets/custom_button_widget.dart';
 
 class KelolaSuratScreen extends StatefulWidget {
   final String? initialSuratId;
-  
+
   const KelolaSuratScreen({Key? key, this.initialSuratId}) : super(key: key);
 
   @override
-  _KelolaSuratScreenState createState() => _KelolaSuratScreenState();
+  State<KelolaSuratScreen> createState() => _KelolaSuratScreenState();
 }
 
 class _KelolaSuratScreenState extends State<KelolaSuratScreen> {
-  List<SuratModel> _suratList = [];
-  SuratModel? _selectedSurat;
-  UserModel? _pemohon;
-  bool _isLoading = true;
-  bool _isProcessing = false;
   final _catatanController = TextEditingController();
   String _selectedStatus = 'pending';
+  bool _isProcessing = false;
 
   @override
   void initState() {
     super.initState();
-    _getSurat();
-    if (widget.initialSuratId != null) {
-      _getSuratDetail(widget.initialSuratId!);
-    }
-  }
-
-  @override
-  void dispose() {
-    _catatanController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _getSurat() async {
-    List<SuratModel> surat = await DatabaseService().getAllSurat();
-    setState(() {
-      _suratList = surat;
-      _isLoading = false;
-    });
-  }
-
-  Future<void> _getSuratDetail(String suratId) async {
-    SuratModel? surat = _suratList.where((s) => s.id == suratId).firstOrNull;
-    
-    if (surat != null) {
-      setState(() {
-        _selectedSurat = surat;
-        _selectedStatus = surat.status;
-        _catatanController.text = surat.catatanAdmin ?? '';
+    // Load data saat widget pertama kali dibuat
+    Future.microtask(() {
+      final provider = context.read<SuratProvider>();
+      provider.loadSurat().then((_) {
+        if (widget.initialSuratId != null) {
+          provider.loadSuratDetail(widget.initialSuratId!);
+        }
       });
-      
-      // Get user data
-      UserModel? user = await AuthService().getUserData(surat.userId);
-      setState(() {
-        _pemohon = user;
-      });
-    }
+    });
   }
 
-  Future<void> _updateSuratStatus() async {
-    if (_selectedSurat == null) return;
-    
-    setState(() {
-      _isProcessing = true;
-    });
+  Future<void> _updateSuratStatus(SuratProvider provider) async {
+    final surat = provider.selectedSurat;
+    if (surat == null) return;
 
-    bool success = await DatabaseService().updateSuratStatus(
-      _selectedSurat!.id,
-      _selectedStatus,
-      _catatanController.text.isEmpty ? null : _catatanController.text,
-    );
+    setState(() => _isProcessing = true);
 
-    setState(() {
-      _isProcessing = false;
-    });
+    try {
+      final confirm = await showDialog<bool>(
+            context: context,
+            builder: (_) => AlertDialog(
+              title: const Text('Perbarui Status'),
+              content: const Text('Apakah Anda yakin ingin memperbarui status surat ini?'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: const Text('Batal'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  child: const Text('Perbarui'),
+                ),
+              ],
+            ),
+          ) ??
+          false;
 
-    if (success) {
+      if (!confirm) return;
+
+      await provider.updateSuratStatus(
+        surat.id,
+        _selectedStatus,
+        _catatanController.text.isEmpty ? null : _catatanController.text,
+      );
+
       Helpers.showSnackBar(
         context,
         'Status surat berhasil diperbarui',
         color: Colors.green,
       );
-      _getSurat();
-      _getSuratDetail(_selectedSurat!.id);
-    } else {
-      Helpers.showSnackBar(
-        context,
-        'Gagal memperbarui status surat',
-      );
+
+      // Reload detail
+      await provider.loadSuratDetail(surat.id);
+    } catch (e) {
+      Helpers.showSnackBar(context, 'Gagal memperbarui status: $e');
+    } finally {
+      setState(() => _isProcessing = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Kelola Surat'),
-        backgroundColor: AppColors.primaryColor,
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : Row(
-              children: [
-                // Surat List
-                Expanded(
-                  flex: 1,
-                  child: ListView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: _suratList.length,
-                    itemBuilder: (context, index) {
-                      final surat = _suratList[index];
-                      final isSelected = _selectedSurat?.id == surat.id;
-                      
-                      return Card(
-                        margin: const EdgeInsets.only(bottom: 16),
-                        elevation: isSelected ? 8 : 2,
-                        color: isSelected ? AppColors.primaryColor.withOpacity(0.1) : null,
-                        child: ListTile(
-                          contentPadding: const EdgeInsets.all(16),
-                          title: Text(
-                            surat.jenisSurat,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Pemohon: ${surat.dataPemohon['nama']}',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Tanggal: ${Helpers.formatDateTime(surat.tanggalPengajuan)}',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: AppColors.textSecondary,
-                                ),
-                              ),
-                            ],
-                          ),
-                          trailing: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+    return Consumer<SuratProvider>(
+      builder: (context, provider, _) {
+        final surat = provider.selectedSurat;
+
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text('Kelola Surat'),
+            backgroundColor: AppColors.primaryColor,
+            elevation: 0,
+          ),
+          body: provider.isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : provider.error != null
+                  ? ErrorMessage(
+                      message: provider.error!,
+                      onRetry: () => provider.loadSurat(),
+                    )
+                  : DefaultTabController(
+                      length: 2,
+                      child: Column(
+                        children: [
+                          // Tabs
+                          Container(
                             decoration: BoxDecoration(
-                              color: Helpers.getStatusColor(surat.status),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              Helpers.getStatusText(surat.status),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
+                              color: AppColors.cardColor,
+                              borderRadius: const BorderRadius.only(
+                                topLeft: Radius.circular(20),
+                                topRight: Radius.circular(20),
                               ),
-                            ),
-                          ),
-                          onTap: () => _getSuratDetail(surat.id),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-                
-                // Surat Detail
-                Expanded(
-                  flex: 2,
-                  child: _selectedSurat == null
-                      ? Container(
-                          padding: const EdgeInsets.all(16),
-                          child: Center(
-                            child: Text(
-                              'Pilih surat untuk melihat detail',
-                              style: TextStyle(
-                                color: AppColors.textSecondary,
-                                fontSize: 16,
-                              ),
-                            ),
-                          ),
-                        )
-                      : SingleChildScrollView(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // Surat Header
-                              Text(
-                                'Detail Surat',
-                                style: const TextStyle(
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                              
-                              // Surat Info
-                              _buildInfoCard('Jenis Surat', _selectedSurat!.jenisSurat),
-                              _buildInfoCard('Status', Helpers.getStatusText(_selectedSurat!.status)),
-                              _buildInfoCard('Tanggal Pengajuan', Helpers.formatDateTime(_selectedSurat!.tanggalPengajuan)),
-                              if (_selectedSurat!.tanggalSelesai != null)
-                                _buildInfoCard('Tanggal Selesai', Helpers.formatDateTime(_selectedSurat!.tanggalSelesai!)),
-                              _buildInfoCard('Keperluan', _selectedSurat!.keperluan),
-                              _buildInfoCard('Metode Penerimaan', _selectedSurat!.metodePenerimaan),
-                              
-                              const SizedBox(height: 24),
-                              
-                              // Pemohon Info
-                              const Text(
-                                'Data Pemohon',
-                                style: TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                              
-                              _buildInfoCard('Nama', _selectedSurat!.dataPemohon['nama']),
-                              _buildInfoCard('NIK', _selectedSurat!.dataPemohon['nik']),
-                              _buildInfoCard('Nomor KK', _selectedSurat!.dataPemohon['noKK']),
-                              _buildInfoCard('Tempat, Tanggal Lahir', '${_selectedSurat!.dataPemohon['tempatLahir']}, ${_selectedSurat!.dataPemohon['tanggalLahir']}'),
-                              _buildInfoCard('Jenis Kelamin', _selectedSurat!.dataPemohon['jenisKelamin']),
-                              _buildInfoCard('Pekerjaan', _selectedSurat!.dataPemohon['pekerjaan']),
-                              _buildInfoCard('Agama', _selectedSurat!.dataPemohon['agama']),
-                              _buildInfoCard('Status Perkawinan', _selectedSurat!.dataPemohon['statusPerkawinan']),
-                              _buildInfoCard('Alamat KTP', _selectedSurat!.dataPemohon['alamatKTP']),
-                              _buildInfoCard('Alamat Domisili', _selectedSurat!.dataPemohon['alamatDomisili']),
-                              _buildInfoCard('Nomor Telepon', _selectedSurat!.dataPemohon['noTelp']),
-                              
-                              const SizedBox(height: 24),
-                              
-                              // Documents
-                              const Text(
-                                'Dokumen Pendukung',
-                                style: TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                              
-                              _selectedSurat!.dokumenUrls.isEmpty
-                                  ? const Text('Tidak ada dokumen pendukung')
-                                  : Column(
-                                      children: _selectedSurat!.dokumenUrls.map((url) {
-                                        return Padding(
-                                          padding: const EdgeInsets.only(bottom: 8),
-                                          child: InkWell(
-                                            onTap: () {
-                                              // Open document in browser or viewer
-                                            },
-                                            child: Container(
-                                              padding: const EdgeInsets.all(12),
-                                              decoration: BoxDecoration(
-                                                color: AppColors.cardColor,
-                                                borderRadius: BorderRadius.circular(8),
-                                                boxShadow: [
-                                                  BoxShadow(
-                                                    color: Colors.grey.withOpacity(0.2),
-                                                    spreadRadius: 1,
-                                                    blurRadius: 3,
-                                                    offset: const Offset(0, 2),
-                                                  ),
-                                                ],
-                                              ),
-                                              child: Row(
-                                                children: [
-                                                  const Icon(Icons.description),
-                                                  const SizedBox(width: 12),
-                                                  Expanded(
-                                                    child: Text(
-                                                      url.split('/').last,
-                                                      overflow: TextOverflow.ellipsis,
-                                                    ),
-                                                  ),
-                                                  const Icon(Icons.open_in_new),
-                                                ],
-                                              ),
-                                            ),
-                                          ),
-                                        );
-                                      }).toList(),
-                                    ),
-                              
-                              const SizedBox(height: 24),
-                              
-                              // Status Update
-                              if (_selectedSurat!.status == 'pending') ...[
-                                const Text(
-                                  'Perbarui Status',
-                                  style: TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                                
-                                DropdownButtonFormField<String>(
-                                  value: _selectedStatus,
-                                  decoration: const InputDecoration(
-                                    labelText: 'Status',
-                                    border: OutlineInputBorder(),
-                                  ),
-                                  items: const [
-                                    DropdownMenuItem(
-                                      value: 'pending',
-                                      child: Text('Menunggu Verifikasi'),
-                                    ),
-                                    DropdownMenuItem(
-                                      value: 'approved',
-                                      child: Text('Disetujui'),
-                                    ),
-                                    DropdownMenuItem(
-                                      value: 'rejected',
-                                      child: Text('Ditolak'),
-                                    ),
-                                  ],
-                                  onChanged: (value) {
-                                    setState(() {
-                                      _selectedStatus = value!;
-                                    });
-                                  },
-                                ),
-                                const SizedBox(height: 16),
-                                
-                                TextFormField(
-                                  controller: _catatanController,
-                                  maxLines: 3,
-                                  decoration: const InputDecoration(
-                                    labelText: 'Catatan (opsional)',
-                                    border: OutlineInputBorder(),
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                                
-                                CustomButtonWidget(
-                                  text: 'Perbarui Status',
-                                  onPressed: _updateSuratStatus,
-                                  isLoading: _isProcessing,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.grey.withOpacity(0.1),
+                                  spreadRadius: 1,
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
                                 ),
                               ],
-                              
-                              // Admin Notes
-                              if (_selectedSurat!.status != 'pending' && _selectedSurat!.catatanAdmin != null) ...[
-                                const Text(
-                                  'Catatan Admin',
-                                  style: TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                                
-                                Container(
-                                  padding: const EdgeInsets.all(16),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.cardColor,
-                                    borderRadius: BorderRadius.circular(8),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.grey.withOpacity(0.2),
-                                        spreadRadius: 1,
-                                        blurRadius: 3,
-                                        offset: const Offset(0, 2),
-                                      ),
-                                    ],
-                                  ),
-                                  child: Text(_selectedSurat!.catatanAdmin!),
-                                ),
+                            ),
+                            child: TabBar(
+                              tabs: const [
+                                Tab(text: 'Daftar Surat'),
+                                Tab(text: 'Detail Surat'),
                               ],
-                            ],
+                              indicatorColor: AppColors.primaryColor,
+                              labelColor: AppColors.primaryColor,
+                              unselectedLabelColor: AppColors.textSecondary,
+                            ),
                           ),
-                        ),
-                ),
-              ],
-            ),
+
+                          // TabBarView
+                          Expanded(
+                            child: TabBarView(
+                              children: [
+                                // Daftar Surat
+                                _buildSuratList(provider),
+                                // Detail Surat
+                                surat == null ? _buildNoSelection() : _buildSuratDetail(provider),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+        );
+      },
     );
   }
 
-  Widget _buildInfoCard(String label, String value) {
+  Widget _buildSuratList(SuratProvider provider) {
+    final list = provider.suratList;
+
+    if (list.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.inbox, size: 64, color: AppColors.textSecondary),
+            const SizedBox(height: 16),
+            Text(
+              'Tidak ada surat',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500, color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Belum ada pengajuan surat dari masyarakat',
+              style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: list.length,
+      itemBuilder: (context, index) {
+        final surat = list[index];
+        final isSelected = provider.selectedSurat?.id == surat.id;
+
+        return SuratCard(
+          surat: surat,
+          isSelected: isSelected,
+          onTap: () => provider.loadSuratDetail(surat.id),
+        );
+      },
+    );
+  }
+
+  Widget _buildNoSelection() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.search, size: 64, color: AppColors.textSecondary),
+          const SizedBox(height: 16),
+          Text(
+            'Pilih surat untuk melihat detail',
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 16),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSuratDetail(SuratProvider provider) {
+    final surat = provider.selectedSurat!;
+    final pemohon = surat.dataPemohon; // Asumsi sudah ada field dataPemohon Map<String, String>
+    _selectedStatus = surat.status;
+    _catatanController.text = surat.catatanAdmin ?? '';
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Surat Info
+          _buildInfoSection('Jenis Surat', surat.jenisSurat),
+          _buildInfoSection('Status', Helpers.getStatusText(surat.status)),
+          _buildInfoSection('Tanggal Pengajuan', Helpers.formatDateTime(surat.tanggalPengajuan)),
+          if (surat.tanggalSelesai != null)
+            _buildInfoSection('Tanggal Selesai', Helpers.formatDateTime(surat.tanggalSelesai!)),
+          _buildInfoSection('Keperluan', surat.keperluan),
+          _buildInfoSection('Metode Penerimaan', surat.metodePenerimaan),
+
+          const SizedBox(height: 24),
+
+          // Data Pemohon
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColors.cardColor,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.1),
+                  spreadRadius: 1,
+                  blurRadius: 5,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Data Pemohon', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+                const SizedBox(height: 12),
+                _buildInfoSection('Nama', pemohon['nama']),
+                _buildInfoSection('NIK', pemohon['nik']),
+                _buildInfoSection('Nomor KK', pemohon['noKK']),
+                _buildInfoSection('Tempat, Tanggal Lahir', '${pemohon['tempatLahir']}, ${pemohon['tanggalLahir']}'),
+                _buildInfoSection('Jenis Kelamin', pemohon['jenisKelamin']),
+                _buildInfoSection('Pekerjaan', pemohon['pekerjaan']),
+                _buildInfoSection('Agama', pemohon['agama']),
+                _buildInfoSection('Status Perkawinan', pemohon['statusPerkawinan']),
+                _buildInfoSection('Alamat KTP', pemohon['alamatKTP']),
+                _buildInfoSection('Alamat Domisili', pemohon['alamatDomisili']),
+                _buildInfoSection('Nomor Telepon', pemohon['noTelp']),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 24),
+
+          // Dokumen Pendukung
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColors.cardColor,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.1),
+                  spreadRadius: 1,
+                  blurRadius: 5,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Dokumen Pendukung', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+                const SizedBox(height: 12),
+                if (surat.dokumenUrls.isEmpty)
+                  const Text('Tidak ada dokumen pendukung')
+                else
+                  ...surat.dokumenUrls.map((url) => Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: InkWell(
+                          onTap: () {
+                            // Buka dokumen
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: AppColors.cardColor,
+                              borderRadius: BorderRadius.circular(8),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.grey.withOpacity(0.1),
+                                  spreadRadius: 1,
+                                  blurRadius: 5,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.description, color: AppColors.primaryColor),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(url.split('/').last, overflow: TextOverflow.ellipsis),
+                                ),
+                                const Icon(Icons.open_in_new, color: AppColors.primaryColor),
+                              ],
+                            ),
+                          ),
+                        ),
+                      )),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 24),
+
+          // Update Status
+          if (surat.status == 'pending') ...[
+            DropdownButtonFormField<String>(
+              value: _selectedStatus,
+              decoration: InputDecoration(
+                labelText: 'Status',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                filled: true,
+                fillColor: Colors.grey[50],
+              ),
+              items: const [
+                DropdownMenuItem(value: 'pending', child: Text('Menunggu Verifikasi')),
+                DropdownMenuItem(value: 'approved', child: Text('Disetujui')),
+                DropdownMenuItem(value: 'rejected', child: Text('Ditolak')),
+              ],
+              onChanged: (value) => setState(() => _selectedStatus = value!),
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _catatanController,
+              maxLines: 3,
+              decoration: InputDecoration(
+                labelText: 'Catatan (opsional)',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                filled: true,
+                fillColor: Colors.grey[50],
+              ),
+            ),
+            const SizedBox(height: 12),
+            CustomButtonWidget(
+              text: 'Perbarui Status',
+              onPressed: () => _updateSuratStatus(provider),
+              isLoading: _isProcessing,
+            ),
+          ],
+
+          // Catatan Admin
+          if (surat.status != 'pending' && surat.catatanAdmin != null) ...[
+            const SizedBox(height: 24),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.cardColor,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.grey.withOpacity(0.1),
+                    spreadRadius: 1,
+                    blurRadius: 5,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Catatan Admin', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+                  const SizedBox(height: 12),
+                  Text(surat.catatanAdmin!),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoSection(String label, String value) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 14,
-              color: AppColors.textSecondary,
-            ),
-          ),
+          Text(label, style: TextStyle(fontSize: 14, color: AppColors.textSecondary, fontWeight: FontWeight.w500)),
           const SizedBox(height: 4),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
+          Text(value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
         ],
       ),
     );

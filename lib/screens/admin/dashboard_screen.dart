@@ -1,12 +1,18 @@
+// lib/screens/admin/dashboard_screen.dart - Refactored with Providers
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:skt_desa/widgets/error_message.dart';
+import 'package:skt_desa/widgets/loading_indicator.dart';
+import '../../providers/surat_provider.dart';
 import '../../models/user_model.dart';
 import '../../models/surat_model.dart';
-import '../../services/auth_service.dart';
-import '../../services/database_service.dart';
+import '../../providers/auth_provider.dart';
 import '../../utils/constants.dart';
 import '../../utils/helpers.dart';
 import 'kelola_berita_screen.dart';
 import 'kelola_surat_screen.dart';
+import '../../widgets/custom_card_widget.dart';
+import '../../widgets/surat_card.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({Key? key}) : super(key: key);
@@ -16,315 +22,294 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  UserModel? _currentUser;
-  List<SuratModel> _suratList = [];
-  bool _isLoading = true;
-
   @override
   void initState() {
     super.initState();
-    _getCurrentUser();
-    _getSurat();
-  }
-
-  Future<void> _getCurrentUser() async {
-    UserModel? user = await AuthService().getUserData(
-      AuthService().currentUser!.uid,
-    );
-    setState(() {
-      _currentUser = user;
-    });
-  }
-
-  Future<void> _getSurat() async {
-    List<SuratModel> surat = await DatabaseService().getAllSurat();
-    setState(() {
-      _suratList = surat;
-      _isLoading = false;
+    // Load data when screen initializes
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<SuratProvider>(context, listen: false).loadSurat();
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    final suratProvider = Provider.of<SuratProvider>(context);
+    final authProvider = Provider.of<AuthProvider>(context);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Dashboard Admin'),
         backgroundColor: AppColors.primaryColor,
+        elevation: 0,
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _getSurat,
+            icon: const Icon(Icons.refresh, color: Colors.white),
+            onPressed: () {
+              Provider.of<SuratProvider>(context, listen: false).loadSurat();
+            },
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _getSurat,
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Welcome Message
-                    Text(
-                      'Selamat Datang, ${_currentUser?.name ?? 'Admin'}!',
-                      style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Kelola layanan surat online untuk masyarakat',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    
-                    // Stats Cards
-                    Row(
+      body: suratProvider.isLoading
+          ? const LoadingIndicator()
+          : suratProvider.error != null
+              ? ErrorMessage(
+                  message: suratProvider.error!,
+                  onRetry: () {
+                    Provider.of<SuratProvider>(context, listen: false).loadSurat();
+                  },
+                )
+              : RefreshIndicator(
+                  onRefresh: () async {
+                    Provider.of<SuratProvider>(context, listen: false).loadSurat();
+                  },
+                  child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          child: _buildStatCard(
-                            'Total Permohonan',
-                            _suratList.length.toString(),
-                            Icons.description,
-                            Colors.blue,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: _buildStatCard(
-                            'Menunggu Verifikasi',
-                            _suratList.where((s) => s.status == 'pending').length.toString(),
-                            Icons.hourglass_empty,
-                            Colors.orange,
-                          ),
-                        ),
+                        // Welcome Message with gradient background
+                        _buildWelcomeMessage(authProvider.currentUser),
+                        const SizedBox(height: 24),
+                        
+                        // Stats Cards with animation
+                        _buildStatsSection(suratProvider.suratList),
+                        const SizedBox(height: 24),
+                        
+                        // Quick Actions with better design
+                        _buildQuickActions(),
+                        const SizedBox(height: 24),
+                        
+                        // Recent Applications with improved UI
+                        _buildRecentApplications(suratProvider.suratList),
                       ],
                     ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildStatCard(
-                            'Disetujui',
-                            _suratList.where((s) => s.status == 'approved').length.toString(),
-                            Icons.check_circle,
-                            Colors.green,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: _buildStatCard(
-                            'Ditolak',
-                            _suratList.where((s) => s.status == 'rejected').length.toString(),
-                            Icons.cancel,
-                            Colors.red,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-                    
-                    // Quick Actions
-                    const Text(
-                      'Aksi Cepat',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildActionCard(
-                            'Kelola Surat',
-                            Icons.description,
-                            Colors.blue,
-                            () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => const KelolaSuratScreen(),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: _buildActionCard(
-                            'Kelola Berita',
-                            Icons.article,
-                            Colors.green,
-                            () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => const KelolaBeritaScreen(),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-                    
-                    // Recent Applications
-                    const Text(
-                      'Permohonan Terbaru',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    _suratList.isEmpty
-                        ? Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: AppColors.cardColor,
-                              borderRadius: BorderRadius.circular(8),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.grey.withOpacity(0.2),
-                                  spreadRadius: 1,
-                                  blurRadius: 3,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: Center(
-                              child: Text(
-                                'Belum ada permohonan',
-                                style: TextStyle(
-                                  color: AppColors.textSecondary,
-                                ),
-                              ),
-                            ),
-                          )
-                        : ListView.builder(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            itemCount: _suratList.length > 5 ? 5 : _suratList.length,
-                            itemBuilder: (context, index) {
-                              final surat = _suratList[index];
-                              return Card(
-                                margin: const EdgeInsets.only(bottom: 16),
-                                elevation: 4,
-                                child: ListTile(
-                                  contentPadding: const EdgeInsets.all(16),
-                                  title: Text(
-                                    surat.jenisSurat,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  subtitle: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'Pemohon: ${surat.dataPemohon['nama']}',
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        'Tanggal: ${Helpers.formatDateTime(surat.tanggalPengajuan)}',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: AppColors.textSecondary,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  trailing: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: Helpers.getStatusColor(surat.status),
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Text(
-                                      Helpers.getStatusText(surat.status),
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                                  onTap: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => KelolaSuratScreen(
-                                          initialSuratId: surat.id,
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                ),
-                              );
-                            },
-                          ),
-                  ],
+                  ),
                 ),
-              ),
-            ),
     );
   }
 
-  Widget _buildStatCard(String title, String value, IconData icon, Color color) {
+  Widget _buildWelcomeMessage(UserModel? user) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AppColors.cardColor,
-        borderRadius: BorderRadius.circular(8),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppColors.primaryColor.withOpacity(0.1),
+            AppColors.secondaryColor.withOpacity(0.1),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.2),
+            color: Colors.grey.withOpacity(0.1),
             spreadRadius: 1,
-            blurRadius: 3,
-            offset: const Offset(0, 2),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Icon(
-                icon,
-                color: color,
-                size: 24,
-              ),
-              const Spacer(),
-            ],
+          Text(
+            'Selamat Datang, ${user?.name ?? 'Admin'}!',
+            style: const TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.bold,
+              color: AppColors.textPrimary,
+            ),
           ),
           const SizedBox(height: 8),
           Text(
-            value,
+            'Kelola layanan surat online untuk masyarakat',
             style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: color,
+              fontSize: 16,
+              color: AppColors.textSecondary,
+              height: 1.5,
             ),
           ),
-          const SizedBox(height: 4),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatsSection(List<SuratModel> suratList) {
+    return Column(
+      children: [
+        // Top row stats
+        Row(
+          children: [
+            Expanded(
+              child: CustomCardWidget(
+                title: 'Total Permohonan',
+                value: suratList.length.toString(),
+                icon: Icons.description,
+                iconColor: Colors.blue,
+                valueColor: Colors.blue,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: CustomCardWidget(
+                title: 'Menunggu Verifikasi',
+                value: suratList.where((s) => s.status == 'pending').length.toString(),
+                icon: Icons.hourglass_empty,
+                iconColor: Colors.orange,
+                valueColor: Colors.orange,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        // Bottom row stats
+        Row(
+          children: [
+            Expanded(
+              child: CustomCardWidget(
+                title: 'Disetujui',
+                value: suratList.where((s) => s.status == 'approved').length.toString(),
+                icon: Icons.check_circle,
+                iconColor: Colors.green,
+                valueColor: Colors.green,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: CustomCardWidget(
+                title: 'Ditolak',
+                value: suratList.where((s) => s.status == 'rejected').length.toString(),
+                icon: Icons.cancel,
+                iconColor: Colors.red,
+                valueColor: Colors.red,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildQuickActions() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Aksi Cepat',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: _buildActionCard(
+                'Kelola Surat',
+                Icons.description,
+                Colors.blue,
+                () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const KelolaSuratScreen(),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: _buildActionCard(
+                'Kelola Berita',
+                Icons.article,
+                Colors.green,
+                () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const KelolaBeritaScreen(),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRecentApplications(List<SuratModel> suratList) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Permohonan Terbaru',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 16),
+        suratList.isEmpty
+            ? _buildEmptyState()
+            : Column(
+                children: suratList.take(5).map((surat) {
+                  return SuratCard(
+                    surat: surat,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => KelolaSuratScreen(
+                            initialSuratId: surat.id,
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                }).toList(),
+              ),
+      ],
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: AppColors.cardColor,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            spreadRadius: 1,
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Icon(
+            Icons.inbox,
+            size: 48,
+            color: AppColors.textSecondary,
+          ),
+          const SizedBox(height: 16),
           Text(
-            title,
+            'Belum ada permohonan',
             style: TextStyle(
-              fontSize: 14,
+              fontSize: 16,
               color: AppColors.textSecondary,
+              fontWeight: FontWeight.w500,
             ),
           ),
         ],
@@ -340,33 +325,41 @@ class _DashboardScreenState extends State<DashboardScreen> {
   ) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(12),
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           color: AppColors.cardColor,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
-              color: Colors.grey.withOpacity(0.2),
+              color: Colors.grey.withOpacity(0.1),
               spreadRadius: 1,
-              blurRadius: 3,
-              offset: const Offset(0, 2),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
         child: Column(
           children: [
-            Icon(
-              icon,
-              color: color,
-              size: 32,
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                icon,
+                color: color,
+                size: 28,
+              ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
             Text(
               title,
               style: const TextStyle(
                 fontWeight: FontWeight.bold,
+                fontSize: 14,
               ),
               textAlign: TextAlign.center,
             ),

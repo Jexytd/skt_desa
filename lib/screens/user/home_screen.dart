@@ -1,5 +1,7 @@
+// lib/screens/user/home_screen.dart - Modified to navigate to service selection
 import 'package:flutter/material.dart';
 import 'package:carousel_slider/carousel_slider.dart';
+import 'package:skt_desa/widgets/berita_card.dart';
 import '../../models/user_model.dart';
 import '../../models/berita_model.dart';
 import '../../services/auth_service.dart';
@@ -7,7 +9,7 @@ import '../../services/database_service.dart';
 import '../../utils/constants.dart';
 import '../../widgets/navbar_widget.dart';
 import '../admin/dashboard_screen.dart';
-import 'layanan_screen.dart';
+import 'service_selection_screen.dart'; // Import the new screen
 import 'faq_screen.dart';
 import 'profile_screen.dart';
 import 'package:skt_desa/utils/helpers.dart';
@@ -33,27 +35,41 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _getCurrentUser() async {
-    UserModel? user = await AuthService().getUserData(
-      AuthService().currentUser!.uid,
-    );
-    setState(() {
-      _currentUser = user;
-    });
+    try {
+      UserModel? user = await AuthService().getUserData(
+        AuthService().currentUser!.uid,
+      );
+      setState(() {
+        _currentUser = user;
+      });
+    } catch (e) {
+      Helpers.showSnackBar(context, 'Gagal memuat data pengguna: $e');
+    }
   }
 
   Future<void> _getBerita() async {
-    List<BeritaModel> berita = await DatabaseService().getAllBerita();
-    setState(() {
-      _beritaList = berita;
-      _isLoading = false;
-    });
+    try {
+      List<BeritaModel> berita = await DatabaseService().getAllBerita();
+      setState(() {
+        _beritaList = berita;
+        _isLoading = false;
+      });
+    } catch (e) {
+      Helpers.showSnackBar(context, 'Gagal memuat berita: $e');
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     // Check if user is admin
     if (_currentUser?.role == 'admin') {
-      return const DashboardScreen();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Navigator.pushReplacementNamed(context, AppRoutes.adminDashboard);
+      });
+      return const SizedBox(); // Return empty widget while navigating
     }
 
     return Scaffold(
@@ -172,54 +188,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                     : _beritaList.length,
                                 itemBuilder: (context, index) {
                                   final berita = _beritaList[index];
-                                  return Card(
-                                    margin: const EdgeInsets.only(bottom: 16),
-                                    elevation: 4,
-                                    child: ListTile(
-                                      contentPadding: const EdgeInsets.all(16),
-                                      leading: Container(
-                                        width: 60,
-                                        height: 60,
-                                        decoration: BoxDecoration(
-                                          borderRadius: BorderRadius.circular(
-                                            8,
-                                          ),
-                                          image: DecorationImage(
-                                            image: NetworkImage(
-                                              berita.imageUrl,
-                                            ),
-                                            fit: BoxFit.cover,
-                                          ),
-                                        ),
-                                      ),
-                                      title: Text(
-                                        berita.judul,
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      subtitle: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            berita.isi,
-                                            maxLines: 2,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            '${Helpers.formatDate(berita.tanggal)} - ${berita.author}',
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              color: AppColors.textSecondary,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
+                                  return BeritaCard(
+                                    berita: berita,
                                   );
                                 },
                               ),
@@ -243,7 +213,7 @@ class _HomeScreenState extends State<HomeScreen> {
             case 1:
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const LayananScreen()),
+                MaterialPageRoute(builder: (context) => const ServiceSelectionScreen()),
               );
               break;
             case 2:

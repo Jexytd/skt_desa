@@ -7,7 +7,7 @@ import '../../utils/helpers.dart';
 import '../../widgets/custom_button_widget.dart';
 import 'register_screen.dart';
 import '../user/home_screen.dart';
-import '../admin/dashboard_screen.dart';
+import '../admin/dashboard_screen.dart'; // Tambahkan import
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -36,45 +36,49 @@ class _LoginScreenState extends State<LoginScreen> {
         _isLoading = true;
       });
 
-      UserCredential? result = await AuthService().signInWithEmailAndPassword(
-        _emailController.text.trim(),
-        _passwordController.text,
-      );
+      try {
+        UserCredential? result = await AuthService().signInWithEmailAndPassword(
+          _emailController.text.trim(),
+          _passwordController.text,
+        );
 
-      setState(() {
-        _isLoading = false;
-      });
+        if (result != null) {
+          // Login berhasil, ambil data user untuk menentukan role
+          try {
+            UserModel? user = await AuthService().getUserData(result.user!.uid);
 
-      if (result != null) {
-        // Login berhasil, ambil data user untuk menentukan role
-        try {
-          UserModel? user = await AuthService().getUserData(result.user!.uid);
-
-          if (user != null) {
-            // Navigasi berdasarkan role user
-            if (user.role == 'admin') {
-              Navigator.of(context).pushAndRemoveUntil(
-                MaterialPageRoute(
-                  builder: (context) => const DashboardScreen(),
-                ),
-                (Route<dynamic> route) => false,
-              );
+            if (user != null) {
+              // Navigasi berdasarkan role user
+              if (user.role == 'admin') {
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(
+                    builder: (context) => const DashboardScreen(),
+                  ),
+                  (Route<dynamic> route) => false,
+                );
+              } else {
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (context) => const HomeScreen()),
+                  (Route<dynamic> route) => false,
+                );
+              }
             } else {
-              Navigator.of(context).pushAndRemoveUntil(
-                MaterialPageRoute(builder: (context) => const HomeScreen()),
-                (Route<dynamic> route) => false,
-              );
+              // Jika data user tidak ditemukan
+              Helpers.showSnackBar(context, 'Data pengguna tidak ditemukan');
             }
-          } else {
-            // Jika data user tidak ditemukan
-            Helpers.showSnackBar(context, 'Data pengguna tidak ditemukan');
+          } catch (e) {
+            // Handle error saat mengambil data user
+            Helpers.showSnackBar(context, 'Terjadi kesalahan: ${e.toString()}');
           }
-        } catch (e) {
-          // Handle error saat mengambil data user
-          Helpers.showSnackBar(context, 'Terjadi kesalahan: ${e.toString()}');
+        } else {
+          Helpers.showSnackBar(context, 'Email atau password salah');
         }
-      } else {
-        Helpers.showSnackBar(context, 'Email atau password salah');
+      } catch (e) {
+        Helpers.showSnackBar(context, 'Terjadi kesalahan login: $e');
+      } finally {
+        setState(() {
+          _isLoading = false;
+        });
       }
     }
   }
